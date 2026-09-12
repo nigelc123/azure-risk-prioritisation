@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS findings (
     finding_id        TEXT PRIMARY KEY, -- Set the finding_id as the primary key.
     asset_id          TEXT NOT NULL REFERENCES assets(asset_id), -- asset_id references the assets table's primary key.
     source            TEXT NOT NULL CHECK (source IN ('prowler', 'wazuh')),
+    resource_uid      TEXT, -- The exact resource the scanner flagged. Differs from asset_id when the finding
+                            -- was attributed to a parent asset (Azure records some security settings on child
+                            -- resources, which have their own IDs and never appear in the assets inventory).
     cve_id            TEXT,
     cvss_score        REAL,
     severity          TEXT,
