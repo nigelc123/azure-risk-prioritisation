@@ -1,6 +1,7 @@
 # Python script to ingest assets from Azure.
 
 # from dotenv import load_dotenv
+import sqlite3
 from datetime import datetime, timezone
 
 from azure.identity import DefaultAzureCredential
@@ -31,42 +32,77 @@ def fetch_assets():
     query_response = client.resources(request)
 
     return query_response.data or []
-    
-print(fetch_assets())
+
+# Azure tags are always strings; normalize to the exact values the exposure CHECK constraint allows.
+VALID_EXPOSURES = {"public": "Public", "private": "Private", "internal": "Internal"}
 
 def upsert_assets(rows):
     conn = get_connection()
     now = datetime.now(timezone.utc).isoformat()
+    inserted = 0
+    skipped = 0
 
     for row in rows:
+        # ARM resource IDs are case-insensitive; Azure Resource Graph and Prowler
+        # don't always agree on casing for the same resource, so normalize to
+        # lowercase here to match the lookup in ingest_findings.py.
+        raw_id = row.get("id")
+        asset_id = raw_id.lower() if raw_id else None
         tags = row.get("tags", {}) or {}
-        conn.execute(
-            """
-            INSERT INTO assets (asset_id, name, resource_type, criticality, exposure, environment, owner, last_seen)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(asset_id) DO UPDATE SET
-                name=excluded.name, 
-                resource_type=excluded.resource_type, 
-                criticality=excluded.criticality, 
-                exposure=excluded.exposure, 
-                environment=excluded.environment, 
-                owner=excluded.owner, 
-                last_seen=excluded.last_seen
-            """,
-            (
-                row.get("id"),
-                row.get("name"),
-                row.get("type"),
-                tags.get("Criticality"),
-                tags.get("Exposure"),
-                tags.get("Environment"),
-                tags.get("Owner"),
-                now,
-            ),
-        )
-        conn.commit()
-        conn.close()
-        print(f"Upserted {len(rows)} assets into the asset database.")
+
+        # criticality must be an integer 1-5; exposure must match the schema's CHECK
+        # constraint exactly — reject rather than let a malformed tag crash the batch.
+        try:
+            criticality = int(str(tags.get("Criticality")).strip())
+        except (TypeError, ValueError):
+            criticality = None
+        if criticality is None or not (1 <= criticality <= 5):
+            skipped += 1
+            print(f"Skipped {asset_id}: invalid Criticality tag {tags.get('Criticality')!r}")
+            continue
+
+        exposure = VALID_EXPOSURES.get(str(tags.get("Exposure") or "").strip().lower())
+        if exposure is None:
+            skipped += 1
+            print(f"Skipped {asset_id}: invalid Exposure tag {tags.get('Exposure')!r}")
+            continue
+
+        try:
+            conn.execute(
+                """
+                INSERT INTO assets (asset_id, name, resource_type, criticality, exposure, environment, owner, last_seen)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(asset_id) DO UPDATE SET
+                    name=excluded.name,
+                    resource_type=excluded.resource_type,
+                    criticality=excluded.criticality,
+                    exposure=excluded.exposure,
+                    environment=excluded.environment,
+                    owner=excluded.owner,
+                    last_seen=excluded.last_seen
+                """,
+                (
+                    asset_id,
+                    row.get("name"),
+                    row.get("type"),
+                    criticality,
+                    exposure,
+                    tags.get("Environment"),
+                    tags.get("Owner"),
+                    now,
+                ),
+            )
+        except sqlite3.IntegrityError as e:
+            skipped += 1
+            print(f"Skipped {asset_id}: {e}")
+            continue
+        inserted += 1
+
+    conn.commit()
+    conn.close()
+    print(f"Upserted {inserted} assets ({skipped} skipped) into the asset database.")
 
 if __name__ == "__main__":
-    upsert_assets(fetch_assets())
+    assets = fetch_assets()
+    print(assets)
+    upsert_assets(assets)

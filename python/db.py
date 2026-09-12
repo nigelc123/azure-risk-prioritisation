@@ -18,7 +18,7 @@ def init_db():
         conn.executescript(f.read())
     conn.commit()
     conn.close()
-    print("Database initialised at {DB_PATH}")
+    print(f"Database initialised at {DB_PATH}")
 
 if __name__ == "__main__":
     init_db()

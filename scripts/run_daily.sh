@@ -23,7 +23,7 @@ run_step() {
     echo "--- ${step_name} ---" | tee -a "$LOG_FILE"
 
     # If the python script runs successfully, print OK and log this.
-    if python "$script_path" >> "$LOG_FILE" 2>&1; then
+    if python3 "$script_path" >> "$LOG_FILE" 2>&1; then
         echo "${step_name}: OK" | tee -a "$LOG_FILE"
     else
     # Or else, print that it failed and log this.
@@ -51,7 +51,7 @@ run_bash_step() {
 
 run_bash_step "Run Prowler scan" "scripts/run_prowler.sh"
 run_step "Ingest assets" "python/ingest_assets.py"
-# run_step "Ingest Prowler findings" "python/ingest_findings.py"
+run_step "Ingest Prowler findings" "python/ingest_findings.py"
 # run_step "Ingest Wazuh findings" "python/ingest_wazuh_findings.py"
 # run_step "Score findings" "python/risk_scorer.py"
 # run_step "Generate report" "python/report.py"

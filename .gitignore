@@ -21,3 +21,6 @@ python/__pycache__/
 
 # OS cruft
 .DS_Store
+
+# Notes on the project that I only want saved locally
+INGESTION_HARDENING.md

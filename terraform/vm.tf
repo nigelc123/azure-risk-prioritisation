@@ -3,6 +3,14 @@ resource "azurerm_virtual_network" "vnet" {
   address_space       = ["10.10.0.0/16"]
   location            = azurerm_resource_group.test-grp.location
   resource_group_name = azurerm_resource_group.test-grp.name
+
+  tags = {
+    Criticality = "3" # Set to 3 to match the criticality rating of the Linux VM that sits within this vnet.
+    Exposure    = "Public"
+    Environment = "Prod"
+    ManagedBy   = "Terraform"
+    Project = "Cloud Risk Prioritisation"
+  }
 }
 
 resource "azurerm_subnet" "subnet" {
@@ -30,6 +38,14 @@ resource "azurerm_network_security_group" "open_nsg" {
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
+  tags = {
+    Criticality = "3" # Set to 3 to match the criticality rating of the Linux VM that this resource is attached to.
+    Exposure    = "Public"
+    Environment = "Prod"
+    ManagedBy   = "Terraform"
+    Project = "Cloud Risk Prioritisation"
+  }
+  
 }
 
 resource "azurerm_public_ip" "vm_public-ip" {
@@ -38,6 +54,14 @@ resource "azurerm_public_ip" "vm_public-ip" {
   resource_group_name = azurerm_resource_group.test-grp.name
   allocation_method   = "Static"
   sku                 = "Standard"
+
+  tags = {
+    Criticality = "3" # Set to 3 to match the criticality rating of the Linux VM that this resource is attached to.
+    Exposure    = "Public"
+    Environment = "Prod"
+    ManagedBy   = "Terraform"
+    Project = "Cloud Risk Prioritisation"
+  }
 }
 
 resource "azurerm_network_interface" "vm_nic" {
@@ -51,6 +75,15 @@ resource "azurerm_network_interface" "vm_nic" {
     private_ip_address_allocation = "Dynamic"
     public_ip_address_id          = azurerm_public_ip.vm_public-ip.id
   }
+
+  tags = {
+    Criticality = "3" # Set to 3 to match the criticality rating of the Linux VM that this resource is attached to.
+    Exposure    = "Public"
+    Environment = "Prod"
+    ManagedBy   = "Terraform"
+    Project = "Cloud Risk Prioritisation"
+  }
+
 }
 
 resource "azurerm_network_interface_security_group_association" "vm_nsg_assoc" {
